@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+materials/
+frontend-design-test/
+artifacts/
+.taste-skill/
+.netlify/
+coverage/
+*.log
+design-review/
+supabase/.temp/
