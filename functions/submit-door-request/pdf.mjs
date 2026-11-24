@@ -26,7 +26,9 @@ export function createEstimatePdf({ number, createdAt, snapshot }) {
     const date = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeZone: 'Europe/Moscow' }).format(new Date(createdAt))
     doc.fontSize(11).text(number + '   /   ' + date).moveDown(1.5)
     doc.fontSize(15).text(snapshot.model)
-    doc.fontSize(11).text('Отделка: ' + snapshot.finish).text('Размер: ' + snapshot.size)
+    doc.fontSize(11).text('Наружная отделка: ' + snapshot.finish)
+    doc.text('Внутренняя панель: ' + snapshot.interior).text('Размер: ' + snapshot.size)
+    if (snapshot.construction) doc.text(snapshot.construction)
     doc.text('Комплектующие: ' + (snapshot.accessories.join(', ') || 'без дополнительных опций')).moveDown()
     doc.fontSize(14).text('Детализация стоимости').moveDown(0.4)
     for (const line of snapshot.lines) {

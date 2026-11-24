@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DoorModel, Finish } from './data/catalog.ts'
 import type { CatalogData } from './data/catalogData.ts'
 import { interiorImageManifest } from './data/imageManifest.ts'
-import { marketReferences } from './data/marketReferences.ts'
+import { constructionSummary, interiorColor, interiorMaterial, interiorOptions, modelSpec } from './data/doorSpecs.ts'
+import { ConstructionDiagram, InteriorSample, ModelPassport } from './ModelPassport.tsx'
 import { calculateEstimate, emptyConfiguration } from './lib/pricing.ts'
 import type { Configuration } from './lib/pricing.ts'
 
-type SavedRequest = { number: string; createdAt: string; snapshot: { model: string; finish: string; size: string; image: string; lines: { key: string; label: string; amount: number }[]; total: number } }
+type SavedRequest = { number: string; createdAt: string; snapshot: { model: string; finish: string; size: string; interior?: string; construction?: string; image: string; lines: { key: string; label: string; amount: number }[]; total: number } }
 
 const money = (value: number) => new Intl.NumberFormat('ru-RU').format(value) + ' ₽'
 const requestUrl = import.meta.env.VITE_DOOR_REQUEST_URL?.trim() ?? ''
@@ -24,15 +25,16 @@ function isSnapshot(value: unknown): value is SavedRequest['snapshot'] {
 }
 
 
-function DoorVisual({ model, finish, compact = false, interactive = false, hoverInterior = false, exteriorImage }: { model: DoorModel; finish: Finish; compact?: boolean; interactive?: boolean; hoverInterior?: boolean; exteriorImage?: string }) {
+function DoorVisual({ model, finish, compact = false, interactive = false, hoverInterior = false, exteriorImage, interiorId }: { model: DoorModel; finish: Finish; compact?: boolean; interactive?: boolean; hoverInterior?: boolean; exteriorImage?: string; interiorId?: string }) {
   const [side, setSide] = useState<'exterior' | 'interior'>('exterior')
   const interior = interiorImageManifest[model.assetModelId]
   useEffect(() => setSide('exterior'), [model.id])
   return (
     <figure className={`door-scene ${compact ? 'door-scene--compact' : ''} ${interactive ? 'door-scene--two-sided' : ''}`} data-side={side} onPointerEnter={interactive && hoverInterior ? event => { if (event.pointerType === 'mouse') setSide('interior') } : undefined} onPointerLeave={interactive && hoverInterior ? event => { if (event.pointerType === 'mouse') setSide('exterior') } : undefined}>
       <img className="door-image--exterior" src={exteriorImage ?? finish.image} alt={`Наружная сторона двери ${model.name}, отделка ${finish.name}`} loading={compact ? 'lazy' : 'eager'} decoding="async" />
-      {interactive && <img className="door-image--interior" src={interior} alt={`Внутренняя сторона двери ${model.name}`} loading={compact ? 'lazy' : 'eager'} decoding="async" />}
-      <figcaption className="scene-caption">Демонстрационная 2D-визуализация</figcaption>
+      {interactive && interiorId !== undefined && side === 'interior' && <InteriorSample color={interiorColor(model.id, interiorId)} />}
+      {interactive && interiorId === undefined && <img className="door-image--interior" src={interior} alt={`Внутренняя сторона двери ${model.name}`} loading={compact ? 'lazy' : 'eager'} decoding="async" />}
+      <figcaption className="scene-caption">{side === 'interior' ? (interiorId === undefined ? 'Пример внутренней стороны' : 'Внутренняя панель') : 'Демонстрационная 2D-визуализация'}</figcaption>
       {interactive && <><span className="side-hint">Вид изнутри</span><div className="side-switch" aria-label={`Сторона двери ${model.name}`}><button type="button" className={side === 'exterior' ? 'is-active' : ''} aria-pressed={side === 'exterior'} onClick={() => setSide('exterior')}>Снаружи</button><button type="button" className={side === 'interior' ? 'is-active' : ''} aria-pressed={side === 'interior'} onClick={() => setSide('interior')}>Изнутри</button></div></>}
     </figure>
   )
@@ -48,12 +50,13 @@ function RequestSummary({ model, finish, config, catalog, total, valid }: { mode
       <div className="request-summary-switch" aria-label="Сторона двери"><button type="button" aria-pressed={side === 'exterior'} className={side === 'exterior' ? 'is-active' : ''} onClick={() => setSide('exterior')}>Снаружи</button><button type="button" aria-pressed={side === 'interior'} className={side === 'interior' ? 'is-active' : ''} onClick={() => setSide('interior')}>Изнутри</button></div>
       <div className="request-summary-photos">
         <figure className={`request-summary-photo ${side === 'exterior' ? 'is-current' : ''}`}>{finish ? <img src={finish.image} alt={`Наружная сторона двери ${model.name}, отделка ${finish.name}`} loading="lazy" /> : <div className="request-summary-photo-empty">Выберите наружную отделку</div>}<figcaption>Снаружи</figcaption></figure>
-        <figure className={`request-summary-photo ${side === 'interior' ? 'is-current' : ''}`}><img src={interiorImageManifest[model.assetModelId]} alt={`Внутренняя сторона двери ${model.name}`} loading="lazy" /><figcaption>Изнутри</figcaption></figure>
+        <figure className={`request-summary-photo ${side === 'interior' ? 'is-current' : ''}`}><InteriorSample color={interiorColor(model.id, config.interiorId)} /><figcaption>Изнутри</figcaption></figure>
       </div>
     </> : <p className="request-summary-empty">Выберите модель, чтобы увидеть обе стороны двери.</p>}
     <dl className="request-summary-details">
       <dt>Модель</dt><dd>{model?.name}</dd>
       <dt>Наружная отделка</dt><dd>{finish?.name}</dd>
+      <dt>Внутренний цвет</dt><dd>{interiorColor(config.modelId, config.interiorId)?.name ?? (config.interiorId === undefined ? 'Не выбран' : 'Недоступен')}</dd>
       <dt>Размер</dt><dd>{size?.label}</dd>
       <dt>Комплектация</dt><dd>{accessories.map(item => item.name).join(', ')}</dd>
       <dt>Доставка</dt><dd>{config.delivery === null ? null : config.delivery ? 'Нужна' : 'Не требуется'}</dd>
@@ -92,7 +95,10 @@ function App({ catalog, source }: { catalog: CatalogData; source: 'demo' | 'live
   const estimate = useMemo(() => calculateEstimate(config, catalog), [config, catalog])
   const model = models.find(item => item.id === config.modelId)
   const finish = model?.finishes.find(item => item.id === config.finishId)
+  const inner = interiorColor(config.modelId, config.interiorId)
+  const spec = model && modelSpec(model.id)
   const estimateDetails = [
+    inner && 'Изнутри: ' + inner.name,
     finish?.name,
     sizes.find(item => item.id === config.sizeId && model?.sizes.includes(item.id))?.label,
   ].filter(Boolean).join(' · ')
@@ -264,6 +270,7 @@ function App({ catalog, source }: { catalog: CatalogData; source: 'demo' | 'live
 
           <section className="catalog section-pad" id="catalog">
             <div className="section-head"><div><span className="section-kicker">01 / КОЛЛЕКЦИЯ</span><h2>Найдите свою{' '}<br />дверь.</h2></div><p>Каждая модель имеет свой характер. Выберите её, чтобы перейти к настройке.</p></div>
+            <p className="catalog-disclaimer">Демонстрационный проект. Модели, технические характеристики и цены представлены в учебных целях</p>
             <div className="catalog-grid">
               {models.map((item, index) => <article className={`model-card ${config.modelId === item.id ? 'model-card--selected' : ''}`} key={item.id}>
                 <div className="card-visual"><DoorVisual model={item} finish={item.finishes[0]} compact interactive hoverInterior /></div>
@@ -272,17 +279,18 @@ function App({ catalog, source }: { catalog: CatalogData; source: 'demo' | 'live
                   <div className="card-title-row"><h3>{item.name}</h3><span>↗</span></div>
                   <p>{item.description}</p>
                   <div className="card-features">{item.features.slice(0, 2).map(feature => <span key={feature}>{feature}</span>)}</div>
-                  {marketReferences[item.id] && <div className="market-reference"><span>ОРИЕНТИР ПО ПРАЙСУ · МОСКВА · {marketReferences[item.id].checkedOn}</span><p>Сопоставимая категория: <a href={marketReferences[item.id].sourceUrl} target="_blank" rel="noopener noreferrer">Torex {marketReferences[item.id].series} ↗</a> от {money(marketReferences[item.id].publishedFrom)}. Цена другой комплектации.</p></div>}
+                  <ModelPassport model={item} sizes={sizes} />
                   <div className="card-bottom"><div><small>БАЗОВАЯ СТОИМОСТЬ</small><strong>{money(item.demoBasePrice)}</strong></div><button onClick={() => selectModel(item)} aria-label={`Выбрать модель ${item.name}`}>{config.modelId === item.id ? 'Выбрана' : 'Выбрать'} <span>→</span></button></div>
                 </div>
               </article>)}
             </div>
+            <ConstructionDiagram />
           </section>
 
           <section className="config-section section-pad" id="configurator">
             <div className="section-head section-head--light"><div><span className="section-kicker">02 / КОНФИГУРАТОР</span><h2 tabIndex={-1}>Создайте{' '}<br />свою конфигурацию.</h2></div><p>Каждый выбор отражается в смете. Окончательную стоимость уточняют после замера.</p></div>
             <div className="config-layout">
-              <aside className={`preview-panel ${model ? '' : 'preview-panel--example'}`}><div className="preview-top"><span>ВАШ ВЫБОР</span><strong>{model?.name ?? 'Пример визуализации'}</strong></div><DoorVisual model={previewModel} finish={previewFinish} interactive /><div className="preview-bottom"><div><span>ОТДЕЛКА</span><strong>{finish?.name ?? 'Не выбрана'}</strong></div><span>2D-визуализация</span></div></aside>
+              <aside className={`preview-panel ${model ? '' : 'preview-panel--example'}`}><div className="preview-top"><span>ВАШ ВЫБОР</span><strong>{model?.name ?? 'Пример визуализации'}</strong></div><DoorVisual model={previewModel} finish={previewFinish} interiorId={config.interiorId} interactive /><div className="preview-bottom"><div><span>ОТДЕЛКА</span><strong>{finish?.name ?? 'Не выбрана'}</strong></div><span>2D-визуализация</span></div></aside>
               <div className="config-form">
                 {editing !== null && <p role="status">Редактируется вариант {editing}. Изменения можно сохранить в разделе «Ваш выбор».</p>}
                 {editing !== null && !estimate.valid && <p className="field-error">Проверьте параметры: {estimate.errors.join('. ')}.</p>}
@@ -292,6 +300,15 @@ function App({ catalog, source }: { catalog: CatalogData; source: 'demo' | 'live
                 <div className="config-step"><div className="step-heading"><span className="step-number">01</span><div><h3>Модель двери</h3><p>Выберите основу вашей конфигурации</p></div></div><div className="select-grid select-grid--models">{models.map(item => <button key={item.id} className={`select-tile ${config.modelId === item.id ? 'is-active' : ''}`} onClick={() => selectModel(item)}><strong>{item.name}</strong><span>от {money(item.demoBasePrice)}</span></button>)}</div>{fieldError('model', !model) && <p className="field-error">Выберите модель двери.</p>}</div>
 
                 <div className="config-step"><div className="step-heading"><span className="step-number">02</span><div><h3>Наружная отделка</h3><p>Выберите отделку для вашей двери</p></div></div><div className="finish-grid">{(model?.finishes ?? []).map(item => <button key={item.id} className={`finish-tile ${config.finishId === item.id ? 'is-active' : ''}`} onClick={() => { setConfig(previous => ({ ...previous, finishId: item.id })); markTouched('finish') }}><img className="finish-swatch" src={item.image} alt="" loading="lazy" /><strong>{item.name}</strong><small>{item.detail}</small><em>{item.demoSurcharge ? `+ ${money(item.demoSurcharge)}` : 'Без надбавки'}</em></button>)}</div>{!model && <p className="step-hint">Сначала выберите модель.</p>}{model && fieldError('finish', !finish) && <p className="field-error">Выберите отделку.</p>}</div>
+
+                {model && interiorOptions(model.id).length > 0 && <fieldset className="interior-picker">
+                  <legend>Внутренний цвет</legend><p>{interiorMaterial}</p>
+                  <div>{interiorOptions(model.id).map(color => <label key={color.id}>
+                    <input type="radio" name="interior" value={color.id} checked={config.interiorId === color.id}
+                      onChange={() => setConfig(previous => ({ ...previous, interiorId: color.id }))} />
+                    <i style={{ backgroundColor: color.tone }} /><span>{color.name}</span>
+                  </label>)}</div>
+                </fieldset>}
 
                 <div className="config-step"><div className="step-heading"><span className="step-number">03</span><div><h3>Размер двери</h3><p>Доступность зависит от модели</p></div></div><div className="size-grid">{sizes.map(item => <button key={item.id} disabled={!model?.sizes.includes(item.id)} className={`choice-button ${config.sizeId === item.id ? 'is-active' : ''}`} onClick={() => { setConfig(previous => ({ ...previous, sizeId: item.id })); markTouched('size') }}><strong>{item.label}</strong><span>{item.demoSurcharge ? `+ ${money(item.demoSurcharge)}` : 'Без надбавки'}</span></button>)}</div>{fieldError('size', !config.sizeId || !model?.sizes.includes(config.sizeId)) && <p className="field-error">Выберите доступный размер.</p>}</div>
 
@@ -371,7 +388,7 @@ function App({ catalog, source }: { catalog: CatalogData; source: 'demo' | 'live
 
       <div className="mobile-total-bar"><div><small>ПРЕДВАРИТЕЛЬНО</small><strong>{estimate.total === null ? '—' : money(saved?.snapshot.total ?? updatedQuote?.total ?? estimate.total)}</strong></div><button onClick={showEstimate}>К расчёту ↗</button></div>
 
-      {estimate.valid && <div className="print-sheet"><div className="print-header"><span>DOOR CONFIG</span><small>РАСЧЁТ КОНФИГУРАЦИИ</small></div><div className="print-meta"><span>№ {saved?.number ?? documentNumber}</span><span>{saved ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long' }).format(new Date(saved.createdAt)) : documentDate}</span></div><h1>Ваша входная дверь</h1><div className="print-intro"><DoorVisual model={model!} finish={finish!} compact exteriorImage={saved?.snapshot.image} /><div><span>МОДЕЛЬ</span><h2>{saved?.snapshot.model ?? estimate.modelName}</h2><p><b>Отделка:</b> {saved?.snapshot.finish ?? estimate.finishName}</p><p><b>Размер:</b> {saved?.snapshot.size ?? estimate.sizeName}</p><p className="print-note">Демонстрационная 2D-визуализация вымышленной модели.</p></div></div><h3>Детализация стоимости</h3><div className="print-lines">{(saved?.snapshot.lines ?? updatedQuote?.lines ?? estimate.lines).map(line => <div key={line.key}><span>{line.label}</span><strong>{money(line.amount)}</strong></div>)}</div><div className="print-total"><span>Общая предварительная стоимость</span><strong>{money(saved?.snapshot.total ?? updatedQuote?.total ?? estimate.total!)}</strong></div><p className="print-disclaimer">Предварительный расчёт. Не является публичной офертой. Итоговую стоимость уточняют после замера.</p></div>}
+      {estimate.valid && <div className="print-sheet"><div className="print-header"><span>DOOR CONFIG</span><small>РАСЧЁТ КОНФИГУРАЦИИ</small></div><div className="print-meta"><span>№ {saved?.number ?? documentNumber}</span><span>{saved ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long' }).format(new Date(saved.createdAt)) : documentDate}</span></div><h1>Ваша входная дверь</h1><div className="print-intro"><DoorVisual model={model!} finish={finish!} compact exteriorImage={saved?.snapshot.image} /><div><span>МОДЕЛЬ</span><h2>{saved?.snapshot.model ?? estimate.modelName}</h2><p><b>Отделка:</b> {saved?.snapshot.finish ?? estimate.finishName}</p><p><b>Внутренняя панель:</b> {saved?.snapshot.interior ?? inner?.name ?? 'Не выбран'}</p>{spec && <p>{saved?.snapshot.construction ?? constructionSummary(spec)}</p>}<p><b>Размер:</b> {saved?.snapshot.size ?? estimate.sizeName}</p><p className="print-note">Демонстрационная 2D-визуализация вымышленной модели.</p></div></div><h3>Детализация стоимости</h3><div className="print-lines">{(saved?.snapshot.lines ?? updatedQuote?.lines ?? estimate.lines).map(line => <div key={line.key}><span>{line.label}</span><strong>{money(line.amount)}</strong></div>)}</div><div className="print-total"><span>Общая предварительная стоимость</span><strong>{money(saved?.snapshot.total ?? updatedQuote?.total ?? estimate.total!)}</strong></div><p className="print-disclaimer">Предварительный расчёт. Не является публичной офертой. Итоговую стоимость уточняют после замера.</p></div>}
     </>
   )
 }

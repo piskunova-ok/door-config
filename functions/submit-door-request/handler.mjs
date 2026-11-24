@@ -1,3 +1,4 @@
+import { constructionSummary, interiorColor, modelSpec } from '../../src/data/doorSpecs.ts'
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { calculateEstimate } from '../../src/lib/pricing.ts'
 import { readCatalog } from './catalog.mjs'
@@ -57,7 +58,10 @@ export function createHandler({ env = process.env, fetchImpl = fetch, render = c
     try { catalog = await readCatalog(env, fetchImpl) } catch { return fail(503, 'Не удалось проверить тарифы. Заявка не отправлена.') }
     const estimate = calculateEstimate(body.configuration, catalog)
     if (!estimate.valid) return fail(422, 'Выбранные параметры недоступны. Проверьте комплектацию по актуальному каталогу.')
+    const spec = modelSpec(body.configuration.modelId)
     const snapshot = {
+      interior: interiorColor(body.configuration.modelId, body.configuration.interiorId)?.name ?? 'Не выбран',
+      construction: spec ? constructionSummary(spec) : '',
       model: estimate.modelName, finish: estimate.finishName, size: estimate.sizeName, image: estimate.image,
       accessories: body.configuration.accessoryIds.map(id => catalog.accessories.find(item => item.id === id).name),
       lines: estimate.lines, total: estimate.total,

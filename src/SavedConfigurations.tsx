@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { interiorImageManifest } from './data/imageManifest.ts'
+import { interiorColor, modelSpec } from './data/doorSpecs.ts'
+import { InteriorSample } from './ModelPassport.tsx'
 import type { CatalogData } from './data/catalogData.ts'
 import { calculateEstimate, type Configuration } from './lib/pricing.ts'
 import { readVariants, slots, writeVariants, type Slot, type Variant } from './lib/savedConfigurations.ts'
@@ -18,7 +19,7 @@ type Props = {
 }
 
 const rubles = (n: number) => n.toLocaleString('ru-RU') + ' ₽'
-const fields = ['Модель', 'Наружная отделка', 'Размер', 'Комплектующие', 'Доставка', 'Монтаж', 'Итоговая стоимость']
+const fields = ['Модель', 'Наружная отделка', 'Размер', 'Комплектующие', 'Доставка', 'Монтаж', 'Внутренний цвет', 'Толщина полотна', 'Толщина стали', 'Контуры уплотнения', 'Итоговая стоимость']
 const unavailable = (id: string | null) => 'Недоступно (' + id + ')'
 
 function describe(variant: Variant, catalog: CatalogData) {
@@ -28,8 +29,12 @@ function describe(variant: Variant, catalog: CatalogData) {
   const finish = model?.finishes.find(f => f.id === c.finishId)
   const size = catalog.sizes.find(s => s.id === c.sizeId && model?.sizes.includes(s.id))
   const accessories = [...new Set(c.accessoryIds)].sort().map(id => catalog.accessories.find(a => a.id === id)?.name ?? unavailable(id))
+  const spec = model && modelSpec(model.id)
+  const color = interiorColor(c.modelId, c.interiorId)
   const values = [model?.name ?? unavailable(c.modelId), finish?.name ?? unavailable(c.finishId), size?.label ?? unavailable(c.sizeId),
     accessories.join(', ') || 'Без дополнений', c.delivery ? 'Нужна' : 'Не нужна', c.installation ? 'Нужен' : 'Не нужен',
+    color?.name ?? (c.interiorId === undefined ? 'Не выбран' : 'Недоступен'),
+    spec ? spec.leaf + ' мм' : '—', spec ? spec.steel + ' мм' : '—', spec ? String(spec.seals) : '—',
     estimate.total === null ? 'Требует исправления' : rubles(estimate.total)]
   return {
     variant,
@@ -51,11 +56,9 @@ function ComparisonDoor({ entry, minimum, onLoad }: {
   const [side, setSide] = useState<'exterior' | 'interior'>('exterior')
   const [failedImage, setFailedImage] = useState<string>()
   const { variant, model, finish, total } = entry
-  const interior = model && interiorImageManifest[model.assetModelId]
-  const image = side === 'interior' ? interior : finish?.image
-  const alt = side === 'interior'
-    ? `Внутренняя сторона двери ${model?.name}`
-    : `Наружная сторона двери ${model?.name}, отделка «${finish?.name}»`
+  const color = interiorColor(variant.config.modelId, variant.config.interiorId)
+  const image = finish?.image
+  const alt = `Наружная сторона двери ${model?.name}, отделка «${finish?.name}»`
   const lowest = total !== null && total === minimum
 
   return (
@@ -65,13 +68,13 @@ function ComparisonDoor({ entry, minimum, onLoad }: {
         <h3>{model?.name ?? variant.modelName}</h3>
       </header>
       <div className="comparison-image">
-        {image && failedImage !== image
+        {side === 'interior' ? <InteriorSample color={color} /> : image && failedImage !== image
           ? <img src={image} alt={alt} onError={() => setFailedImage(image)} />
-          : <p>{!model ? 'Модель недоступна' : !finish && side === 'exterior' ? 'Отделка недоступна' : 'Фото недоступно'}</p>}
+          : <p>{!model ? 'Модель недоступна' : !finish ? 'Отделка недоступна' : 'Фото недоступно'}</p>}
       </div>
       <div className="comparison-sides" role="group" aria-label={'Сторона двери, вариант ' + variant.slot}>
         <button type="button" aria-pressed={side === 'exterior'} onClick={() => setSide('exterior')}>Снаружи</button>
-        <button type="button" aria-pressed={side === 'interior'} onClick={() => setSide('interior')} disabled={!interior}>Изнутри</button>
+        <button type="button" aria-pressed={side === 'interior'} onClick={() => setSide('interior')} disabled={!model}>Изнутри</button>
       </div>
       <p className="comparison-finish">{finish?.name ?? 'Отделка недоступна'}</p>
       {total === null
@@ -191,7 +194,7 @@ export default function SavedConfigurations({ catalog, config, storageKey, store
       {!current.valid && <p>Для сохранения завершите расчёт в конфигураторе.</p>}
       <p role="status">{[store.warning, message].filter(Boolean).join(' ')}</p>
       {cards.map(({ variant, title, values, total }) => <article className="variant-card" key={variant.slot}>
-        <h4>{title}</h4><p>{values[1]} · {values[2]}</p>
+        <h4>{title}</h4><p>{values[1]} · {values[2]} · изнутри: {values[6]}</p>
         {total === null ? <p className="variant-warning">Каталог изменился. Загрузите вариант и исправьте недоступные параметры.</p> : <strong>{rubles(total)}</strong>}
         <div className="variant-actions">
           <button aria-label={'Загрузить вариант ' + variant.slot} onClick={() => { setMessage(''); onLoad(variant) }}>Загрузить вариант</button>

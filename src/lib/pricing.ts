@@ -1,8 +1,10 @@
+import { interiorColor } from '../data/doorSpecs.ts'
 import { localDemoCatalog } from '../data/catalogData.ts'
 import type { CatalogData } from '../data/catalogData.ts'
 
 export type Configuration = {
   modelId: string | null
+  interiorId?: string
   finishId: string | null
   sizeId: string | null
   accessoryIds: string[]
@@ -35,6 +37,7 @@ export function calculateEstimate(config: Configuration, catalog: CatalogData = 
   const finish = model?.finishes.find(item => item.id === config.finishId)
   const size = catalog.sizes.find(item => item.id === config.sizeId && model?.sizes.includes(item.id))
 
+  if (config.interiorId !== undefined && !interiorColor(config.modelId, config.interiorId)) errors.push('Выберите доступный цвет внутренней панели')
   if (!model) errors.push('Выберите модель двери')
   if (!finish) errors.push('Выберите отделку')
   if (!size) errors.push('Выберите доступный размер')

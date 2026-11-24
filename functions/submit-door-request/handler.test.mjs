@@ -124,3 +124,18 @@ test('warm instance limits repeated attempts', async () => {
   for (let n = 0; n < 8; n++) assert.equal((await f.invoke(e)).statusCode, 400)
   assert.equal((await f.invoke(e)).statusCode, 429)
 })
+
+test('interior selection uses server labels and leaves the price unchanged', async () => {
+  const f = fixture()
+  const body = submission()
+  body.configuration.interiorId = 'latte'
+  const result = await f.invoke(eventFor(body))
+  assert.equal(result.statusCode, 200)
+  const { snapshot } = JSON.parse(result.body)
+  assert.equal(snapshot.interior, 'Латте')
+  assert.match(snapshot.construction, /80 мм/)
+  assert.equal(snapshot.total, body.quote.total)
+  body.configuration.interiorId = 'Неизвестная панель'
+  assert.equal((await f.invoke(eventFor(body))).statusCode, 422)
+  assert.equal(f.letters.length, 1)
+})
