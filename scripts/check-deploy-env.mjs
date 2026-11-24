@@ -19,3 +19,9 @@ try {
   console.error('Netlify build stopped: check the DOOR CONFIG Supabase URL and use a public publishable key, never a service-role key.')
   process.exit(1)
 }
+
+if (process.env.VITE_DOOR_REQUESTS_ENABLED === 'true' &&
+    !/^https:\/\/functions\.yandexcloud\.net\/[a-z0-9-]+$/.test(process.env.VITE_DOOR_REQUEST_URL?.trim() ?? '')) {
+  console.error('Netlify build stopped: set VITE_DOOR_REQUEST_URL to the HTTPS invocation URL of your Yandex Cloud Function.')
+  process.exit(1)
+}
