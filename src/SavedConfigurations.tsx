@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { interiorColor, modelSpec } from './data/doorSpecs.ts'
-import { InteriorSample } from './ModelPassport.tsx'
+import { interiorFinishImage } from './data/imageManifest.ts'
 import type { CatalogData } from './data/catalogData.ts'
 import { calculateEstimate, type Configuration } from './lib/pricing.ts'
 import { readVariants, slots, writeVariants, type Slot, type Variant } from './lib/savedConfigurations.ts'
@@ -57,8 +57,8 @@ function ComparisonDoor({ entry, minimum, onLoad }: {
   const [failedImage, setFailedImage] = useState<string>()
   const { variant, model, finish, total } = entry
   const color = interiorColor(variant.config.modelId, variant.config.interiorId)
-  const image = finish?.image
-  const alt = `Наружная сторона двери ${model?.name}, отделка «${finish?.name}»`
+  const image = side === 'exterior' ? finish?.image : model && color && interiorFinishImage(model.id, color.id)
+  const alt = side === 'interior' ? `Внутренняя сторона двери ${model?.name}, ${color?.name}` : `Наружная сторона двери ${model?.name}, отделка «${finish?.name}»`
   const lowest = total !== null && total === minimum
 
   return (
@@ -68,7 +68,7 @@ function ComparisonDoor({ entry, minimum, onLoad }: {
         <h3>{model?.name ?? variant.modelName}</h3>
       </header>
       <div className="comparison-image">
-        {side === 'interior' ? <InteriorSample color={color} /> : image && failedImage !== image
+        {image && failedImage !== image
           ? <img src={image} alt={alt} onError={() => setFailedImage(image)} />
           : <p>{!model ? 'Модель недоступна' : !finish ? 'Отделка недоступна' : 'Фото недоступно'}</p>}
       </div>
@@ -76,7 +76,7 @@ function ComparisonDoor({ entry, minimum, onLoad }: {
         <button type="button" aria-pressed={side === 'exterior'} onClick={() => setSide('exterior')}>Снаружи</button>
         <button type="button" aria-pressed={side === 'interior'} onClick={() => setSide('interior')} disabled={!model}>Изнутри</button>
       </div>
-      <p className="comparison-finish">{finish?.name ?? 'Отделка недоступна'}</p>
+      <p className="comparison-finish">{side === 'interior' ? color?.name ?? 'Цвет не выбран' : finish?.name ?? 'Отделка недоступна'}</p>
       {total === null
         ? <p className="variant-warning">Параметры устарели. Загрузите вариант, чтобы исправить их.</p>
         : <div className={lowest ? 'comparison-price is-lowest' : 'comparison-price'}>
