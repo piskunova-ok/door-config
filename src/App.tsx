@@ -239,7 +239,7 @@ function App({ catalog, source }: { catalog: CatalogData; source: 'demo' | 'live
       <div className="site-shell">
         <header className="site-header">
           <a className="brand" href="#top" aria-label="DOOR CONFIG — на главную"><span className="brand-mark">D<span>.</span></span><span>DOOR <b>CONFIG</b></span></a>
-          <nav aria-label="Основная навигация"><a href="#catalog">Модели</a><a href="#configurator">Конфигуратор</a><a href="#request">Ваш выбор</a></nav>
+          <nav aria-label="Основная навигация"><a href="#catalog">Модели</a><a href="#configurator">Конфигуратор</a><a href="#selection">Ваш выбор</a>{requestsEnabled && source === 'live' && <a href="#request">Заявка</a>}</nav>
           <button className="header-action" onClick={() => scrollTo('catalog')}>Начать расчёт <span>↗</span></button>
         </header>
         {source === 'demo' && <div className="catalog-mode-banner" role="status">Локальный режим: Supabase не подключён. Показаны исходные цены; изменения через /admin пока недоступны.</div>}
@@ -258,8 +258,7 @@ function App({ catalog, source }: { catalog: CatalogData; source: 'demo' | 'live
             </div>
             <figure className="hero-photo">
               <picture>
-                <source media="(max-width: 767px)" srcSet="/images/hero/axis-portrait.png" width={2475} height={4235} />
-                <img src="/images/hero/warm-interior.png" alt="Графитовая входная дверь Axis в современном интерьере" width={1915} height={821} fetchPriority="high" />
+                <img src="/images/hero/Herro.jpg" alt="Графитовая входная дверь Axis в современном интерьере" width={5922} height={2422} fetchPriority="high" />
               </picture>
               <span className="hero-collection">Коллекция 2026</span>
               <figcaption className="hero-model"><span className="hero-model-label">Модель коллекции</span><strong>Axis</strong><span className="hero-model-finish">Графит</span></figcaption>
@@ -368,17 +367,24 @@ function App({ catalog, source }: { catalog: CatalogData; source: 'demo' | 'live
               </section>
             </aside></div></section>
 
-          <section className={`request-section section-pad ${requestsEnabled && source === 'live' ? '' : 'request-section--demo'}`} id="request">{!comparisonOpen && <div className="section-head"><div><span className="section-kicker">04 / {requestsEnabled && source === 'live' ? 'ЗАЯВКА' : 'ВАШ ВЫБОР'}</span><h2>{requestsEnabled && source === 'live' ? <>Сохраните расчёт{' '}<br />и оставьте заявку.</> : 'Сохраните и сравните'}</h2></div></div>}
-            <div className={comparisonOpen ? 'request-layout request-layout--comparison' : 'request-layout'}>
-              {!comparisonOpen && <RequestSummary model={model} finish={finish} config={config} catalog={catalog} total={saved?.snapshot.total ?? updatedQuote?.total ?? estimate.total} valid={estimate.valid} />}
-            {!comparisonOpen && requestsEnabled && source === 'live' ? saved ? <div className="request-success" role="status"><h3>Заявка № {saved.number} принята</h3><p>Итог по тарифам на момент отправки: {money(saved.snapshot.total)}. Почтовый сервис принял письмо со сметой для менеджера.</p><a href="#estimate">Перейти к смете ↗</a></div> : <form className="request-form" onSubmit={event => void submitRequest(event)}><p>Для отправки заполните контакты. Выбранные модель, отделка, размер и смета уже включены в заявку.</p><div className="request-fields"><label>Имя<input required minLength={2} maxLength={100} value={contact.name} onChange={event => setContact({ ...contact, name: event.target.value })} autoComplete="name" /></label><label>Телефон<input required type="tel" minLength={7} maxLength={25} pattern="[+0-9 \(\)\-]{7,25}" value={contact.phone} onChange={event => setContact({ ...contact, phone: event.target.value })} autoComplete="tel" /></label><label>Email (необязательно)<input type="email" maxLength={254} value={contact.email} onChange={event => setContact({ ...contact, email: event.target.value })} autoComplete="email" /></label><label className="request-wide">Комментарий<textarea maxLength={2000} rows={4} value={contact.comment} onChange={event => setContact({ ...contact, comment: event.target.value })} /></label></div><label className="request-consent"><input type="checkbox" required checked={contact.consent} onChange={event => setContact({ ...contact, consent: event.target.checked })} /> Согласен на обработку персональных данных для ответа на заявку.</label><label className="request-trap" aria-hidden="true">Сайт<input tabIndex={-1} autoComplete="off" value={contact.website} onChange={event => setContact({ ...contact, website: event.target.value })} /></label>{updatedQuote && <div role="status" className="request-wide">
-              <strong>Стоимость изменилась. Проверьте обновлённую смету.</strong>
-              <ul>{updatedQuote.lines.map(line => <li key={line.key}>{line.label} · {money(line.amount)}</li>)}</ul>
-              <p>Новый итог: <strong>{money(updatedQuote.total)}</strong>. Для отправки подтвердите эту стоимость.</p>
-            </div>}{submitError && <p className="request-error" role="alert">{submitError}</p>}<button className="primary-button" type="submit" disabled={!estimate.valid || submitting}>{submitting ? 'Отправляем…' : updatedQuote ? 'Подтвердить стоимость и отправить' : 'Отправить заявку ↗'}</button></form> : null}
+          <section className="request-section section-pad" id="selection" aria-labelledby="selection-title">
+            <div className="section-head"><div><span className="section-kicker">04 / ВАШ ВЫБОР</span><h2 id="selection-title">Сохраните и сравните</h2></div></div>
+            <div className="selection-content">
               <SavedConfigurations catalog={catalog} config={config} editing={editing} onEdit={setEditing}
                 storageKey={storageKey} store={variantStore} onStoreChange={setVariantStore} onLoad={loadVariant}
                 comparisonOpen={comparisonOpen} onComparisonChange={setComparisonOpen} />
+            </div>
+          </section>
+
+          <section className="request-section section-pad" id="request" aria-labelledby="request-title">
+            <div className="section-head"><div><span className="section-kicker">05 / ЗАЯВКА</span><h2 id="request-title">Оставьте заявку</h2></div></div>
+            <div className="request-layout">
+              <RequestSummary model={model} finish={finish} config={config} catalog={catalog} total={saved?.snapshot.total ?? updatedQuote?.total ?? estimate.total} valid={estimate.valid} />
+              {requestsEnabled && source === 'live' ? saved ? <div className="request-success" role="status"><h3>Заявка № {saved.number} принята</h3><p>Итог по тарифам на момент отправки: {money(saved.snapshot.total)}. Почтовый сервис принял письмо со сметой для менеджера.</p><a href="#estimate">Перейти к смете ↗</a></div> : <form className="request-form" onSubmit={event => void submitRequest(event)}><p>Для отправки заполните контакты. Выбранные модель, отделка, размер и смета уже включены в заявку.</p><div className="request-fields"><label>Имя<input required minLength={2} maxLength={100} value={contact.name} onChange={event => setContact({ ...contact, name: event.target.value })} autoComplete="name" /></label><label>Телефон<input required type="tel" minLength={7} maxLength={25} pattern="[+0-9 \(\)\-]{7,25}" value={contact.phone} onChange={event => setContact({ ...contact, phone: event.target.value })} autoComplete="tel" /></label><label>Email (необязательно)<input type="email" maxLength={254} value={contact.email} onChange={event => setContact({ ...contact, email: event.target.value })} autoComplete="email" /></label><label className="request-wide">Комментарий<textarea maxLength={2000} rows={4} value={contact.comment} onChange={event => setContact({ ...contact, comment: event.target.value })} /></label></div><label className="request-consent"><input type="checkbox" required checked={contact.consent} onChange={event => setContact({ ...contact, consent: event.target.checked })} /> Согласен на обработку персональных данных для ответа на заявку.</label><label className="request-trap" aria-hidden="true">Сайт<input tabIndex={-1} autoComplete="off" value={contact.website} onChange={event => setContact({ ...contact, website: event.target.value })} /></label>{updatedQuote && <div role="status" className="request-wide">
+              <strong>Стоимость изменилась. Проверьте обновлённую смету.</strong>
+              <ul>{updatedQuote.lines.map(line => <li key={line.key}>{line.label} · {money(line.amount)}</li>)}</ul>
+              <p>Новый итог: <strong>{money(updatedQuote.total)}</strong>. Для отправки подтвердите эту стоимость.</p>
+            </div>}{submitError && <p className="request-error" role="alert">{submitError}</p>}<button className="primary-button" type="submit" disabled={!estimate.valid || submitting}>{submitting ? 'Отправляем…' : updatedQuote ? 'Подтвердить стоимость и отправить' : 'Отправить заявку ↗'}</button></form> : <p className="request-message">Приём заявок временно отключён.</p>}
             </div>
           </section>
           </div>

@@ -101,7 +101,7 @@ function DoorComparison({ cards, onBack, onLoad }: {
 
   useEffect(() => {
     heading.current?.focus({ preventScroll: true })
-    document.getElementById('request')?.scrollIntoView({ block: 'start', behavior: 'instant' })
+    document.getElementById('selection')?.scrollIntoView({ block: 'start', behavior: 'instant' })
   }, [])
 
   return (

@@ -1,7 +1,7 @@
 import { constructionSummary, interiorColor, modelSpec } from '../../src/data/doorSpecs.ts'
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { calculateEstimate } from '../../src/lib/pricing.ts'
-import { readCatalog } from './catalog.mjs'
+import { CatalogError, readCatalog } from './catalog.mjs'
 import { createEstimatePdf } from './pdf.mjs'
 import { sendEstimate } from './postbox.mjs'
 import { matchesQuote, validSubmission } from './validation.mjs'
@@ -55,7 +55,12 @@ export function createHandler({ env = process.env, fetchImpl = fetch, render = c
     const token = context?.token?.access_token
     if (!token || !env.POSTBOX_FROM || !env.POSTBOX_TO) return fail(503, unavailable)
     let catalog
-    try { catalog = await readCatalog(env, fetchImpl) } catch { return fail(503, 'Не удалось проверить тарифы. Заявка не отправлена.') }
+    try {
+      catalog = await readCatalog(env, fetchImpl)
+    } catch (error) {
+      console.error('catalog_read_failed', error instanceof CatalogError ? error.diagnostic : { stage: 'unknown' })
+      return reply(503, { ...(error instanceof CatalogError && error.timing ? { timing: error.timing } : {}), code: error instanceof CatalogError ? error.code : 'CATALOG_UNKNOWN', error: 'Не удалось проверить тарифы. Заявка не отправлена.' })
+    }
     const estimate = calculateEstimate(body.configuration, catalog)
     if (!estimate.valid) return fail(422, 'Выбранные параметры недоступны. Проверьте комплектацию по актуальному каталогу.')
     const spec = modelSpec(body.configuration.modelId)
