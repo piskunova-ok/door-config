@@ -657,10 +657,7 @@
 .variant-card p{margin:5px 0}
 .variant-card .variant-actions{margin-top:8px}
 .variants .variant-warning{color:#814023}
-.request-section .request-layout--comparison{
-  max-width:1520px;
-  grid-template-columns:minmax(0,1fr);
-}
+.selection-content{width:min(100%,1520px);margin-inline:auto}
 .variant-comparison{
   --comparison-count:3;
   --comparison-parameter-width:clamp(106px,12vw,152px);
@@ -849,6 +846,13 @@
 }
 .hero-photo,.hero-photo picture{position:absolute;inset:0;margin:0}
 .hero-photo{z-index:-1}
+.hero-photo picture::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg,rgba(250,246,237,.24),rgba(250,246,237,0) 60%);
+  pointer-events:none;
+}
 .hero-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 55%}
 .hero-collection,.hero-model{
   position:absolute;
@@ -905,10 +909,10 @@
   content:"";
   position:absolute;
   z-index:-1;
-  inset:-7px -10px;
-  border-radius:5px;
-  background:#faf0dd73;
-  filter:blur(11px);
+  inset-block:clamp(-20px,-1.35vw,-10px);
+  left:calc(-1 * var(--hero-gutter));
+  width:max(42vw,calc(100% + var(--hero-gutter) + 12px));
+  background:rgba(248,238,224,.52);
   pointer-events:none;
 }
 .hero .primary-button{
@@ -942,12 +946,14 @@
     --hero-gutter:clamp(14px,4.55vw,26px);
     min-height:clamp(495px,154.95vw,790px);
   }
-  /* The portrait source has a 400px white margin above the photograph. */
-  .hero-photo img{position:absolute;bottom:0;height:110.43%;object-position:center bottom}
+  .hero-photo img{object-position:66% center}
+  .hero-photo picture::after{
+    background:linear-gradient(90deg,rgba(250,246,237,.78),rgba(250,246,237,.58) 42%,rgba(250,246,237,0) 76%);
+  }
   .hero-copy{padding:clamp(44px,13.1vw,68px) var(--hero-gutter) 86px}
   .hero h1{margin-bottom:clamp(30px,9.7vw,46px);line-height:1}
   .hero-title-first{margin-left:-3px;font-size:clamp(28px,8.8vw,48px)}
-  .hero-title-key{margin-left:0;font-size:clamp(56px,18.8vw,102px)}
+  .hero-title-key{margin-left:-4px;font-size:clamp(56px,18.8vw,102px)}
   .hero-title-last{margin-left:0;font-size:clamp(27px,9vw,50px)}
   .hero-description{
     max-width:min(100%,550px);
