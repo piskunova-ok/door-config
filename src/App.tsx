@@ -3,9 +3,9 @@ import { readVariants, type Slot, type Variant } from './lib/savedConfigurations
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DoorModel, Finish } from './data/catalog.ts'
 import type { CatalogData } from './data/catalogData.ts'
-import { interiorImageManifest } from './data/imageManifest.ts'
+import { interiorFinishImage, interiorImageManifest } from './data/imageManifest.ts'
 import { constructionSummary, interiorColor, interiorMaterial, interiorOptions, modelSpec } from './data/doorSpecs.ts'
-import { ConstructionDiagram, InteriorSample, ModelPassport } from './ModelPassport.tsx'
+import { ConstructionDiagram, ModelPassport } from './ModelPassport.tsx'
 import { calculateEstimate, emptyConfiguration } from './lib/pricing.ts'
 import type { Configuration } from './lib/pricing.ts'
 
@@ -25,23 +25,26 @@ function isSnapshot(value: unknown): value is SavedRequest['snapshot'] {
 }
 
 
-function DoorVisual({ model, finish, compact = false, interactive = false, hoverInterior = false, exteriorImage, interiorId }: { model: DoorModel; finish: Finish; compact?: boolean; interactive?: boolean; hoverInterior?: boolean; exteriorImage?: string; interiorId?: string }) {
+function DoorVisual({ model, finish, compact = false, interactive = false, hoverInterior = false, exteriorImage, interiorId, previewFinishLabel }: { model: DoorModel; finish: Finish; compact?: boolean; interactive?: boolean; hoverInterior?: boolean; exteriorImage?: string; interiorId?: string; previewFinishLabel?: string }) {
   const [side, setSide] = useState<'exterior' | 'interior'>('exterior')
   const interior = interiorImageManifest[model.assetModelId]
-  useEffect(() => setSide('exterior'), [model.id])
+  const color = interiorColor(model.id, interiorId)
+  useEffect(() => setSide(interiorId ? 'interior' : 'exterior'), [model.id, interiorId])
   return (
-    <figure className={`door-scene ${compact ? 'door-scene--compact' : ''} ${interactive ? 'door-scene--two-sided' : ''}`} data-side={side} onPointerEnter={interactive && hoverInterior ? event => { if (event.pointerType === 'mouse') setSide('interior') } : undefined} onPointerLeave={interactive && hoverInterior ? event => { if (event.pointerType === 'mouse') setSide('exterior') } : undefined}>
+    <><figure className={`door-scene ${compact ? 'door-scene--compact' : ''} ${interactive ? 'door-scene--two-sided' : ''}`} data-side={side} onPointerEnter={interactive && hoverInterior ? event => { if (event.pointerType === 'mouse') setSide('interior') } : undefined} onPointerLeave={interactive && hoverInterior ? event => { if (event.pointerType === 'mouse') setSide('exterior') } : undefined}>
       <img className="door-image--exterior" src={exteriorImage ?? finish.image} alt={`Наружная сторона двери ${model.name}, отделка ${finish.name}`} loading={compact ? 'lazy' : 'eager'} decoding="async" />
-      {interactive && interiorId !== undefined && side === 'interior' && <InteriorSample color={interiorColor(model.id, interiorId)} />}
-      {interactive && interiorId === undefined && <img className="door-image--interior" src={interior} alt={`Внутренняя сторона двери ${model.name}`} loading={compact ? 'lazy' : 'eager'} decoding="async" />}
-      <figcaption className="scene-caption">{side === 'interior' ? (interiorId === undefined ? 'Пример внутренней стороны' : 'Внутренняя панель') : 'Демонстрационная 2D-визуализация'}</figcaption>
+      {interactive && <img className="door-image--interior" src={color ? interiorFinishImage(model.id, color.id) : interior} alt={`Внутренняя сторона двери ${model.name}${color ? ', ' + color.name : ''}`} decoding="async" />}
+      <figcaption className="scene-caption">{side === 'interior' ? (interiorId === undefined ? 'Пример внутренней стороны' : color?.name ?? 'Внутренняя панель') : 'Демонстрационная 2D-визуализация'}</figcaption>
       {interactive && <><span className="side-hint">Вид изнутри</span><div className="side-switch" aria-label={`Сторона двери ${model.name}`}><button type="button" className={side === 'exterior' ? 'is-active' : ''} aria-pressed={side === 'exterior'} onClick={() => setSide('exterior')}>Снаружи</button><button type="button" className={side === 'interior' ? 'is-active' : ''} aria-pressed={side === 'interior'} onClick={() => setSide('interior')}>Изнутри</button></div></>}
     </figure>
+      {previewFinishLabel && <div className="preview-bottom"><div><span>{side === 'interior' ? 'ВНУТРЕННИЙ ЦВЕТ' : 'ОТДЕЛКА'}</span><strong>{side === 'interior' ? color?.name ?? 'Не выбран' : previewFinishLabel}</strong></div><span>2D-визуализация</span></div>}
+    </>
   )
 }
 
 function RequestSummary({ model, finish, config, catalog, total, valid }: { model?: DoorModel; finish?: Finish; config: Configuration; catalog: CatalogData; total: number | null; valid: boolean }) {
   const [side, setSide] = useState<'exterior' | 'interior'>('exterior')
+  const color = interiorColor(config.modelId, config.interiorId)
   const size = catalog.sizes.find(item => item.id === config.sizeId && model?.sizes.includes(item.id))
   const accessories = catalog.accessories.filter(item => config.accessoryIds.includes(item.id))
   return <aside className="request-summary" aria-label="Ваша конфигурация">
@@ -50,7 +53,7 @@ function RequestSummary({ model, finish, config, catalog, total, valid }: { mode
       <div className="request-summary-switch" aria-label="Сторона двери"><button type="button" aria-pressed={side === 'exterior'} className={side === 'exterior' ? 'is-active' : ''} onClick={() => setSide('exterior')}>Снаружи</button><button type="button" aria-pressed={side === 'interior'} className={side === 'interior' ? 'is-active' : ''} onClick={() => setSide('interior')}>Изнутри</button></div>
       <div className="request-summary-photos">
         <figure className={`request-summary-photo ${side === 'exterior' ? 'is-current' : ''}`}>{finish ? <img src={finish.image} alt={`Наружная сторона двери ${model.name}, отделка ${finish.name}`} loading="lazy" /> : <div className="request-summary-photo-empty">Выберите наружную отделку</div>}<figcaption>Снаружи</figcaption></figure>
-        <figure className={`request-summary-photo ${side === 'interior' ? 'is-current' : ''}`}><InteriorSample color={interiorColor(model.id, config.interiorId)} /><figcaption>Изнутри</figcaption></figure>
+        <figure className={`request-summary-photo ${side === 'interior' ? 'is-current' : ''}`}>{color ? <img src={interiorFinishImage(model.id, color.id)} alt={`Внутренняя сторона двери ${model.name}, ${color.name}`} loading="lazy" /> : <div className="request-summary-photo-empty">Цвет не выбран</div>}<figcaption>Изнутри{color && ` · ${color.name}`}</figcaption></figure>
       </div>
     </> : <p className="request-summary-empty">Выберите модель, чтобы увидеть обе стороны двери.</p>}
     <dl className="request-summary-details">
@@ -289,7 +292,7 @@ function App({ catalog, source }: { catalog: CatalogData; source: 'demo' | 'live
           <section className="config-section section-pad" id="configurator">
             <div className="section-head section-head--light"><div><span className="section-kicker">02 / КОНФИГУРАТОР</span><h2 tabIndex={-1}>Создайте{' '}<br />свою конфигурацию.</h2></div><p>Каждый выбор отражается в смете. Окончательную стоимость уточняют после замера.</p></div>
             <div className="config-layout">
-              <aside className={`preview-panel ${model ? '' : 'preview-panel--example'}`}><div className="preview-top"><span>ВАШ ВЫБОР</span><strong>{model?.name ?? 'Пример визуализации'}</strong></div><DoorVisual model={previewModel} finish={previewFinish} interiorId={config.interiorId} interactive /><div className="preview-bottom"><div><span>ОТДЕЛКА</span><strong>{finish?.name ?? 'Не выбрана'}</strong></div><span>2D-визуализация</span></div></aside>
+              <aside className={`preview-panel ${model ? '' : 'preview-panel--example'}`}><div className="preview-top"><span>ВАШ ВЫБОР</span><strong>{model?.name ?? 'Пример визуализации'}</strong></div><DoorVisual model={previewModel} finish={previewFinish} interiorId={config.interiorId} interactive previewFinishLabel={finish?.name ?? 'Не выбрана'} /></aside>
               <div className="config-form">
                 {editing !== null && <p role="status">Редактируется вариант {editing}. Изменения можно сохранить в разделе «Ваш выбор».</p>}
                 {editing !== null && !estimate.valid && <p className="field-error">Проверьте параметры: {estimate.errors.join('. ')}.</p>}

@@ -42,3 +42,8 @@ export const interiorImageManifest = {
   'dc-04-stone': `${root}dc-04-stone__interior.webp`,
   'dc-05-geo': `${root}dc-05-geo__interior.webp`,
 } as const
+
+// Input files named warm-gray use the existing catalog ID warm-grey in WebP.
+export function interiorFinishImage(modelId: string, colorId: string) {
+  return `/images/interior/${modelId}/${colorId}.webp`
+}
